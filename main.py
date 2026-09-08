@@ -1,0 +1,64 @@
+import os
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise ValueError("GEMINI_API_KEY não encontrada nas variáveis de ambiente.")
+
+client = genai.Client(api_key=api_key)
+
+app = FastAPI(
+    title="Feedback Sentinel API",
+    description="Microserviço para análise de sentimento e resumo de feedbacks usando IA.",
+    version="1.0.0"
+)
+
+class FeedbackRequest(BaseModel):
+    cliente: str
+    comentario: str
+
+class FeedbackResponse(BaseModel):
+    sentimento: str
+    pontos_chave: str
+    acao_recomendada: str
+
+@app.get("/health", tags=["Healthcheck"])
+def health_check():
+    return {"status": "ok", "service": "online"}
+
+@app.post("/analisar-feedback", response_model=FeedbackResponse, tags=["Análise"])
+def analisar_feedback(data: FeedbackRequest):
+    prompt = f"""
+    Você é um assistente de análise de experiência do cliente.
+    Análise o seguinte comentário enviado pelo cliente {data.cliente}:
+    "{data.comentario}"
+
+    Responda EXATAMENTE no formato JSON abaixo, sem formatação Markdown adicional (não use ```json):
+    {{
+        "sentimento": "Positivo, Negativo ou Neutro",
+        "pontos_chave": "Resumo dos pontos principais em uma frase",
+        "acao_recomendada": "Sugestão prática de ação para a equipe"
+    }}
+    """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+        
+        import json
+        resultado = json.loads(response.text)
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar análise: {str(e)}")
