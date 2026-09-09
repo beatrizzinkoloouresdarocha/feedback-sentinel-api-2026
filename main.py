@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -47,21 +48,31 @@ def analisar_feedback(data: FeedbackRequest):
     "{data.comentario}"
     """
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=FeedbackResponse,
-            ),
-        )
+    # Tenta até 3 vezes em caso de erro 503 (alta demanda)
+    max_retries = 3
+    for tentativa in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=FeedbackResponse,
+                ),
+            )
 
-        # O retorno usando response_schema aceita conversão via json.loads
-        resultado = json.loads(response.text)
-        return resultado
+            resultado = json.loads(response.text)
+            return resultado
 
-    except (APIError, ValueError, json.JSONDecodeError) as e:
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao processar análise: {e!s}"
-        )
+        except APIError as e:
+            # Se for indisponibilidade temporária (503), aguarda 2s e tenta de novo
+            if "503" in str(e) and tentativa < max_retries - 1:
+                time.sleep(2)
+                continue
+            raise HTTPException(
+                status_code=500, detail=f"Erro na API do Gemini: {e!s}"
+            )
+        except (ValueError, json.JSONDecodeError) as e:
+            raise HTTPException(
+                status_code=500, detail=f"Erro ao processar resposta: {e!s}"
+            )
