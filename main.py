@@ -48,7 +48,7 @@ def analisar_feedback(data: FeedbackRequest):
     "{data.comentario}"
     """
 
-    max_retries = 3
+    max_retries = 4
     for tentativa in range(max_retries):
         try:
             response = client.models.generate_content(
@@ -64,8 +64,11 @@ def analisar_feedback(data: FeedbackRequest):
             return resultado
 
         except APIError as e:
-            if "503" in str(e) and tentativa < max_retries - 1:
-                time.sleep(2)
+            # Captura 503 (UNAVAILABLE) ou 429 (RATE_LIMIT) e aguarda mais tempo a cada tentativa
+            erro_str = str(e)
+            if ("503" in erro_str or "429" in erro_str) and tentativa < max_retries - 1:
+                tempo_espera = (tentativa + 1) * 2  # Espera 2s, depois 4s, depois 6s...
+                time.sleep(tempo_espera)
                 continue
             raise HTTPException(
                 status_code=500, detail=f"Erro na API do Gemini: {e!s}"
