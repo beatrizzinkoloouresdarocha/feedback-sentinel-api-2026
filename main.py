@@ -48,12 +48,11 @@ def analisar_feedback(data: FeedbackRequest):
     "{data.comentario}"
     """
 
-    # Tenta até 3 vezes em caso de erro 503 (alta demanda)
     max_retries = 3
     for tentativa in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.6-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -65,7 +64,6 @@ def analisar_feedback(data: FeedbackRequest):
             return resultado
 
         except APIError as e:
-            # Se for indisponibilidade temporária (503), aguarda 2s e tenta de novo
             if "503" in str(e) and tentativa < max_retries - 1:
                 time.sleep(2)
                 continue
