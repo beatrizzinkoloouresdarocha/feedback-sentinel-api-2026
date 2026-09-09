@@ -43,24 +43,21 @@ def health_check():
 def analisar_feedback(data: FeedbackRequest):
     prompt = f"""
     Você é um assistente de análise de experiência do cliente.
-    Análise o seguinte comentário enviado pelo cliente {data.cliente}:
+    Analise o seguinte comentário enviado pelo cliente {data.cliente}:
     "{data.comentario}"
-
-    Responda EXATAMENTE no formato JSON abaixo, sem formatação Markdown adicional (não use ```json):
-    {{
-        "sentimento": "Positivo, Negativo ou Neutro",
-        "pontos_chave": "Resumo dos pontos principais em uma frase",
-        "acao_recomendada": "Sugestão prática de ação para a equipe"
-    }}
     """
 
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=FeedbackResponse,
+            ),
         )
 
+        # O retorno usando response_schema aceita conversão via json.loads
         resultado = json.loads(response.text)
         return resultado
 
