@@ -4,6 +4,7 @@ import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
@@ -37,10 +38,18 @@ class FeedbackResponse(BaseModel):
 
 @app.get("/health", tags=["Healthcheck"])
 def health_check():
-    return {"status": "ok", "service": "online"}
+    return JSONResponse(
+        content={"status": "ok", "service": "online"},
+        media_type="application/json; charset=utf-8",
+    )
 
 
-@app.post("/analisar-feedback", response_model=FeedbackResponse, tags=["Análise"])
+@app.post(
+    "/analisar-feedback",
+    response_model=FeedbackResponse,
+    response_class=JSONResponse,
+    tags=["Análise"],
+)
 def analisar_feedback(data: FeedbackRequest):
     prompt = f"""
     Você é um assistente de análise de experiência do cliente.
@@ -61,12 +70,17 @@ def analisar_feedback(data: FeedbackRequest):
             )
 
             resultado = json.loads(response.text)
-            return resultado
+            return JSONResponse(
+                content=resultado,
+                media_type="application/json; charset=utf-8",
+            )
 
         except APIError as e:
             # Captura 503 (UNAVAILABLE) ou 429 (RATE_LIMIT) e aguarda mais tempo a cada tentativa
             erro_str = str(e)
-            if ("503" in erro_str or "429" in erro_str) and tentativa < max_retries - 1:
+            if (
+                "503" in erro_str or "429" in erro_str
+            ) and tentativa < max_retries - 1:
                 tempo_espera = (tentativa + 1) * 2  # Espera 2s, depois 4s, depois 6s...
                 time.sleep(tempo_espera)
                 continue
